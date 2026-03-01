@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="#faf8ef">
+<meta name="theme-color" content="#faf8ef">
+<title>2048</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #faf8ef;
+  color: #776e65;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100dvh;
+  overflow: hidden;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.container {
+  width: min(95vw, 500px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.title { font-size: 3rem; font-weight: 800; color: #776e65; }
+
+.scores {
+  display: flex;
+  gap: 8px;
+}
+
+.score-box {
+  background: #bbada0;
+  color: #fff;
+  border-radius: 6px;
+  padding: 6px 16px;
+  text-align: center;
+  min-width: 70px;
+}
+
+.score-box .label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.score-box .value {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  background: #8f7a66;
+  color: #f9f6f2;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 18px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn:active { background: #7a6658; }
+
+.board-wrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+}
+
+.board {
+  position: absolute;
+  inset: 0;
+  background: #bbada0;
+  border-radius: 8px;
+  padding: 2%;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+  gap: 2%;
+}
+
+.cell-bg {
+  background: rgba(238, 228, 218, 0.35);
+  border-radius: 6px;
+}
+
+.tiles-layer {
+  position: absolute;
+  inset: 0;
+  padding: 2%;
+}
+
+.tile {
+  position: absolute;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: 700;
+  border-radius: 6px;
+  transition: top 120ms ease, left 120ms ease;
+}
+
+.tile.merged { animation: pop 200ms ease 120ms; }
+.tile.new { animation: appear 200ms ease; }
+
+@keyframes appear {
+  0% { transform: scale(0); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(238, 228, 218, 0.73);
+  border-radius: 8px;
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  z-index: 10;
+}
+
+.overlay.active { display: flex; }
+
+.overlay-msg {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: #776e65;
+}
+
+.overlay.win { background: rgba(237, 194, 46, 0.5); }
+.overlay.win .overlay-msg { color: #f9f6f2; }
+
+.score-add {
+  position: absolute;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #776e65;
+  animation: score-fly 600ms ease forwards;
+  pointer-events: none;
+  z-index: 5;
+}
+
+@keyframes score-fly {
+  0% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-60px); }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="title">2048</div>
+    <div class="scores">
+      <div class="score-box"><div class="label">Score</div><div class="value" id="score">0</div></div>
+      <div class="score-box"><div class="label">Best</div><div class="value" id="best">0</div></div>
+    </div>
+  </div>
+  <div class="controls">
+    <button class="btn" id="btn-new">New Game</button>
+    <button class="btn" id="btn-undo">Undo</button>
+  </div>
+  <div class="board-wrapper">
+    <div class="board" id="board"></div>
+    <div class="tiles-layer" id="tiles-layer"></div>
+    <div class="overlay" id="overlay">
+      <div class="overlay-msg" id="overlay-msg"></div>
+      <button class="btn" id="btn-retry">Try Again</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const SIZE = 4;
+  let grid, score, best, prevState, won, over;
+
+  const $ = id => document.getElementById(id);
+  const scoreEl = $('score'), bestEl = $('best');
+  const boardEl = $('board'), tilesEl = $('tiles-layer');
+  const overlay = $('overlay'), overlayMsg = $('overlay-msg');
+
+  // Build background cells
+  for (let i = 0; i < 16; i++) {
+    const d = document.createElement('div');
+    d.className = 'cell-bg';
+    boardEl.appendChild(d);
+  }
+
+  // Tile colors
+  const COLORS = {
+    2:    { bg: '#eee4da', fg: '#776e65' },
+    4:    { bg: '#ede0c8', fg: '#776e65' },
+    8:    { bg: '#f2b179', fg: '#f9f6f2' },
+    16:   { bg: '#f59563', fg: '#f9f6f2' },
+    32:   { bg: '#f67c5f', fg: '#f9f6f2' },
+    64:   { bg: '#f65e3b', fg: '#f9f6f2' },
+    128:  { bg: '#edcf72', fg: '#f9f6f2' },
+    256:  { bg: '#edcc61', fg: '#f9f6f2' },
+    512:  { bg: '#edc850', fg: '#f9f6f2' },
+    1024: { bg: '#edc53f', fg: '#f9f6f2' },
+    2048: { bg: '#edc22e', fg: '#f9f6f2' },
+  };
+
+  function tileColor(v) {
+    return COLORS[v] || { bg: '#3c3a32', fg: '#f9f6f2' };
+  }
+
+  function fontSize(v) {
+    if (v < 100) return '2.2em';
+    if (v < 1000) return '1.8em';
+    if (v < 10000) return '1.4em';
+    return '1.1em';
+  }
+
+  function init() {
+    grid = Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
+    score = 0;
+    won = false;
+    over = false;
+    prevState = null;
+    overlay.classList.remove('active', 'win');
+    addRandomTile();
+    addRandomTile();
+    render();
+    save();
+  }
+
+  function addRandomTile() {
+    const cells = [];
+    for (let r = 0; r < SIZE; r++)
+      for (let c = 0; c < SIZE; c++)
+        if (!grid[r][c]) cells.push([r, c]);
+    if (!cells.length) return null;
+    const [r, c] = cells[Math.floor(Math.random() * cells.length)];
+    grid[r][c] = Math.random() < 0.9 ? 2 : 4;
+    return [r, c, grid[r][c]];
+  }
+
+  function cloneGrid() { return grid.map(r => [...r]); }
+
+  function slide(row) {
+    let arr = row.filter(v => v);
+    let merged = [];
+    let pts = 0;
+    for (let i = 0; i < arr.length; i++) {
+      if (i + 1 < arr.length && arr[i] === arr[i + 1]) {
+        const val = arr[i] * 2;
+        merged.push(val);
+        pts += val;
+        i++;
+      } else {
+        merged.push(arr[i]);
+      }
+    }
+    while (merged.length < SIZE) merged.push(0);
+    return { row: merged, pts };
+  }
+
+  function move(dir) {
+    if (over) return false;
+    const prev = cloneGrid();
+    const prevScore = score;
+    let totalPts = 0;
+
+    if (dir === 'left' || dir === 'right') {
+      for (let r = 0; r < SIZE; r++) {
+        let row = [...grid[r]];
+        if (dir === 'right') row.reverse();
+        const { row: newRow, pts } = slide(row);
+        if (dir === 'right') newRow.reverse();
+        grid[r] = newRow;
+        totalPts += pts;
+      }
+    } else {
+      for (let c = 0; c < SIZE; c++) {
+        let col = [];
+        for (let r = 0; r < SIZE; r++) col.push(grid[r][c]);
+        if (dir === 'down') col.reverse();
+        const { row: newCol, pts } = slide(col);
+        if (dir === 'down') newCol.reverse();
+        for (let r = 0; r < SIZE; r++) grid[r][c] = newCol[r];
+        totalPts += pts;
+      }
+    }
+
+    const changed = prev.some((row, r) => row.some((v, c) => v !== grid[r][c]));
+    if (!changed) return false;
+
+    prevState = { grid: prev, score: prevScore };
+    score += totalPts;
+    if (score > best) {
+      best = score;
+      localStorage.setItem('2048-best', best);
+    }
+
+    const newTile = addRandomTile();
+    render(newTile, totalPts);
+
+    if (!won && grid.some(row => row.includes(2048))) {
+      won = true;
+      showOverlay('You Win!', true);
+    } else if (isGameOver()) {
+      over = true;
+      showOverlay('Game Over', false);
+    }
+
+    save();
+    return true;
+  }
+
+  function isGameOver() {
+    for (let r = 0; r < SIZE; r++)
+      for (let c = 0; c < SIZE; c++) {
+        if (!grid[r][c]) return false;
+        if (c + 1 < SIZE && grid[r][c] === grid[r][c + 1]) return false;
+        if (r + 1 < SIZE && grid[r][c] === grid[r + 1][c]) return false;
+      }
+    return true;
+  }
+
+  function undo() {
+    if (!prevState) return;
+    grid = prevState.grid;
+    score = prevState.score;
+    prevState = null;
+    over = false;
+    won = false;
+    overlay.classList.remove('active', 'win');
+    render();
+    save();
+  }
+
+  function showOverlay(msg, isWin) {
+    overlayMsg.textContent = msg;
+    overlay.classList.add('active');
+    if (isWin) overlay.classList.add('win');
+  }
+
+  function cellPos(r, c) {
+    // gap is 2%, cell size = (100% - 5*2%) / 4 = 22.5%, offset = 2% + i*(22.5%+2%)
+    const gap = 2;
+    const cellSize = (100 - gap * 5) / 4;
+    return {
+      left: `${gap + c * (cellSize + gap)}%`,
+      top: `${gap + r * (cellSize + gap)}%`,
+      size: `${cellSize}%`,
+    };
+  }
+
+  function render(newTileInfo, pointsAdded) {
+    tilesEl.innerHTML = '';
+    for (let r = 0; r < SIZE; r++) {
+      for (let c = 0; c < SIZE; c++) {
+        const v = grid[r][c];
+        if (!v) continue;
+        const { left, top, size } = cellPos(r, c);
+        const tile = document.createElement('div');
+        tile.className = 'tile';
+        const color = tileColor(v);
+        tile.style.cssText = `left:${left};top:${top};width:${size};height:${size};background:${color.bg};color:${color.fg};font-size:${fontSize(v)};`;
+        tile.textContent = v;
+
+        if (newTileInfo && newTileInfo[0] === r && newTileInfo[1] === c) {
+          tile.classList.add('new');
+        }
+        tilesEl.appendChild(tile);
+      }
+    }
+    scoreEl.textContent = score;
+    bestEl.textContent = best;
+
+    if (pointsAdded) {
+      const fly = document.createElement('div');
+      fly.className = 'score-add';
+      fly.textContent = '+' + pointsAdded;
+      fly.style.cssText = 'top:0;right:0;';
+      const wrapper = document.querySelector('.board-wrapper');
+      wrapper.appendChild(fly);
+      fly.addEventListener('animationend', () => fly.remove());
+    }
+  }
+
+  function save() {
+    localStorage.setItem('2048-state', JSON.stringify({ grid, score, won, over }));
+  }
+
+  function load() {
+    best = parseInt(localStorage.getItem('2048-best')) || 0;
+    const saved = localStorage.getItem('2048-state');
+    if (saved) {
+      const s = JSON.parse(saved);
+      grid = s.grid;
+      score = s.score;
+      won = s.won || false;
+      over = s.over || false;
+      prevState = null;
+      render();
+      if (over) showOverlay('Game Over', false);
+    } else {
+      init();
+    }
+  }
+
+  // Input handling
+  // Keyboard
+  document.addEventListener('keydown', e => {
+    const map = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
+    if (map[e.key]) { e.preventDefault(); move(map[e.key]); }
+  });
+
+  // Touch / swipe
+  let touchStartX, touchStartY;
+  document.addEventListener('touchstart', e => {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+
+  document.addEventListener('touchend', e => {
+    if (touchStartX == null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    const absDx = Math.abs(dx), absDy = Math.abs(dy);
+    const threshold = 30;
+
+    if (Math.max(absDx, absDy) < threshold) return;
+
+    if (absDx > absDy) {
+      move(dx > 0 ? 'right' : 'left');
+    } else {
+      move(dy > 0 ? 'down' : 'up');
+    }
+    touchStartX = null;
+  }, { passive: true });
+
+  // Buttons
+  $('btn-new').addEventListener('click', init);
+  $('btn-retry').addEventListener('click', init);
+  $('btn-undo').addEventListener('click', undo);
+
+  // Service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js');
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>
