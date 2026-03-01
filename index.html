@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="#faf8ef">
-<meta name="theme-color" content="#faf8ef">
+<meta name="apple-mobile-web-app-status-bar-style" content="#0a0a0f">
+<meta name="theme-color" content="#0a0a0f">
 <title>2048</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
@@ -14,9 +14,9 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #faf8ef;
-  color: #776e65;
+  font-family: 'Courier New', 'Menlo', monospace;
+  background: #0a0a0f;
+  color: #e0e0e0;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -40,7 +40,13 @@ body {
   align-items: center;
 }
 
-.title { font-size: 3rem; font-weight: 800; color: #776e65; }
+.title {
+  font-size: 3rem;
+  font-weight: 800;
+  color: #00fff2;
+  text-shadow: 0 0 20px rgba(0, 255, 242, 0.5), 0 0 40px rgba(0, 255, 242, 0.2);
+  letter-spacing: 4px;
+}
 
 .scores {
   display: flex;
@@ -48,12 +54,14 @@ body {
 }
 
 .score-box {
-  background: #bbada0;
-  color: #fff;
+  background: #1a1a2e;
+  color: #e0e0e0;
   border-radius: 6px;
   padding: 6px 16px;
   text-align: center;
   min-width: 70px;
+  border: 1px solid #ff2d95;
+  box-shadow: 0 0 8px rgba(255, 45, 149, 0.3);
 }
 
 .score-box .label {
@@ -62,9 +70,14 @@ body {
   letter-spacing: 1px;
 }
 
+.score-box .label {
+  color: #ff2d95;
+}
+
 .score-box .value {
   font-size: 1.3rem;
   font-weight: 700;
+  color: #fff;
 }
 
 .controls {
@@ -73,18 +86,25 @@ body {
 }
 
 .btn {
-  background: #8f7a66;
-  color: #f9f6f2;
-  border: none;
+  background: transparent;
+  color: #00fff2;
+  border: 1px solid #00fff2;
   border-radius: 6px;
   padding: 10px 18px;
+  font-family: inherit;
   font-size: 0.85rem;
   font-weight: 700;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: background 150ms, box-shadow 150ms;
 }
 
-.btn:active { background: #7a6658; }
+.btn:active {
+  background: rgba(0, 255, 242, 0.15);
+  box-shadow: 0 0 12px rgba(0, 255, 242, 0.4);
+}
 
 .board-wrapper {
   position: relative;
@@ -95,18 +115,21 @@ body {
 .board {
   position: absolute;
   inset: 0;
-  background: #bbada0;
+  background: #12121f;
   border-radius: 8px;
   padding: 2%;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   grid-template-rows: repeat(4, 1fr);
   gap: 2%;
+  border: 1px solid rgba(0, 255, 242, 0.2);
+  box-shadow: 0 0 30px rgba(0, 255, 242, 0.1), inset 0 0 30px rgba(0, 0, 0, 0.3);
 }
 
 .cell-bg {
-  background: rgba(238, 228, 218, 0.35);
+  background: rgba(255, 255, 255, 0.05);
   border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .tiles-layer {
@@ -142,7 +165,7 @@ body {
 .overlay {
   position: absolute;
   inset: 0;
-  background: rgba(238, 228, 218, 0.73);
+  background: rgba(10, 10, 15, 0.85);
   border-radius: 8px;
   display: none;
   flex-direction: column;
@@ -150,6 +173,7 @@ body {
   align-items: center;
   gap: 16px;
   z-index: 10;
+  backdrop-filter: blur(4px);
 }
 
 .overlay.active { display: flex; }
@@ -157,17 +181,22 @@ body {
 .overlay-msg {
   font-size: 2.2rem;
   font-weight: 800;
-  color: #776e65;
+  color: #ff2d95;
+  text-shadow: 0 0 20px rgba(255, 45, 149, 0.6);
 }
 
-.overlay.win { background: rgba(237, 194, 46, 0.5); }
-.overlay.win .overlay-msg { color: #f9f6f2; }
+.overlay.win { background: rgba(10, 10, 15, 0.8); }
+.overlay.win .overlay-msg {
+  color: #00fff2;
+  text-shadow: 0 0 30px rgba(0, 255, 242, 0.8);
+}
 
 .score-add {
   position: absolute;
   font-size: 1.2rem;
   font-weight: 700;
-  color: #776e65;
+  color: #00fff2;
+  text-shadow: 0 0 10px rgba(0, 255, 242, 0.6);
   animation: score-fly 600ms ease forwards;
   pointer-events: none;
   z-index: 5;
@@ -221,21 +250,21 @@ body {
 
   // Tile colors
   const COLORS = {
-    2:    { bg: '#eee4da', fg: '#776e65' },
-    4:    { bg: '#ede0c8', fg: '#776e65' },
-    8:    { bg: '#f2b179', fg: '#f9f6f2' },
-    16:   { bg: '#f59563', fg: '#f9f6f2' },
-    32:   { bg: '#f67c5f', fg: '#f9f6f2' },
-    64:   { bg: '#f65e3b', fg: '#f9f6f2' },
-    128:  { bg: '#edcf72', fg: '#f9f6f2' },
-    256:  { bg: '#edcc61', fg: '#f9f6f2' },
-    512:  { bg: '#edc850', fg: '#f9f6f2' },
-    1024: { bg: '#edc53f', fg: '#f9f6f2' },
-    2048: { bg: '#edc22e', fg: '#f9f6f2' },
+    2:    { bg: '#1a1a2e', fg: '#00fff2', border: '#00fff2' },
+    4:    { bg: '#1a1a2e', fg: '#00e5ff', border: '#00e5ff' },
+    8:    { bg: '#0d2137', fg: '#00bcd4', border: '#00bcd4' },
+    16:   { bg: '#1b0a2e', fg: '#e040fb', border: '#e040fb' },
+    32:   { bg: '#2a0845', fg: '#ea80fc', border: '#ea80fc' },
+    64:   { bg: '#3d0066', fg: '#ff2d95', border: '#ff2d95' },
+    128:  { bg: '#1a0033', fg: '#ff6ec7', border: '#ff6ec7' },
+    256:  { bg: '#002244', fg: '#ffab40', border: '#ffab40' },
+    512:  { bg: '#003300', fg: '#76ff03', border: '#76ff03' },
+    1024: { bg: '#332200', fg: '#ffd740', border: '#ffd740' },
+    2048: { bg: '#00fff2', fg: '#0a0a0f', border: '#00fff2' },
   };
 
   function tileColor(v) {
-    return COLORS[v] || { bg: '#3c3a32', fg: '#f9f6f2' };
+    return COLORS[v] || { bg: '#ff2d95', fg: '#0a0a0f', border: '#ff2d95' };
   }
 
   function fontSize(v) {
@@ -390,7 +419,8 @@ body {
         const tile = document.createElement('div');
         tile.className = 'tile';
         const color = tileColor(v);
-        tile.style.cssText = `left:${left};top:${top};width:${size};height:${size};background:${color.bg};color:${color.fg};font-size:${fontSize(v)};`;
+        const glow = color.border || color.fg;
+        tile.style.cssText = `left:${left};top:${top};width:${size};height:${size};background:${color.bg};color:${color.fg};font-size:${fontSize(v)};border:1px solid ${glow};box-shadow:0 0 10px ${glow}44, inset 0 0 10px ${glow}22;text-shadow:0 0 8px ${glow};`;
         tile.textContent = v;
 
         if (newTileInfo && newTileInfo[0] === r && newTileInfo[1] === c) {
